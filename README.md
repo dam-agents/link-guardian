@@ -35,7 +35,7 @@ pnpm test          # vitest, covers both deep modules
 pnpm typecheck
 ```
 
-The deep modules (`check-links.ts`, `reconcile-state.ts`) are pure-ish and fully unit-testable without network access. The agent layer (`SKILL.md`) is verified by running the bot against a test repo — not unit-tested.
+The deep modules (`check-links.ts`, `reconcile-state.ts`) are pure-ish and fully unit-testable without network access. The agent layer (`SKILL.md`) is verified by running the bot against a test repo; it is not unit-tested.
 
 ## Design
 

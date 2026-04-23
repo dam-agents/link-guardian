@@ -3,9 +3,8 @@ dist/
 coverage/
 *.log
 
-# Runtime workspace state — lives on PVC, never committed.
+# Runtime workspace state. Lives on PVC, never committed.
 state/
-MEMORY.md
 
 # Local target-repo checkouts fetched at run time.
 repos/

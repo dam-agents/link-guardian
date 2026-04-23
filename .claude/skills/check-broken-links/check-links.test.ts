@@ -224,6 +224,45 @@ describe("classifyAbsolute", () => {
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("dns failure");
   });
+
+  it("reports broken when 5xx keeps failing after retry", async () => {
+    const { client, calls } = fakeHttp([
+      { response: new Response(null, { status: 503 }) },
+      { response: new Response(null, { status: 503 }) },
+    ]);
+    const r = await classifyAbsolute("https://example.com", client, opts);
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(503);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("aborts after timeout and reports broken", async () => {
+    const http: HttpClient = (_url, { signal }) =>
+      new Promise((_, reject) => {
+        signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    const r = await classifyAbsolute("https://slow.example.com", http, {
+      timeoutMs: 20,
+      retries: 0,
+      maxRedirects: 5,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/timeout/i);
+  });
+
+  it("treats redirect to a private host as broken (SSRF guard)", async () => {
+    const { client } = fakeHttp([
+      {
+        response: new Response(null, {
+          status: 301,
+          headers: { location: "http://127.0.0.1/admin" },
+        }),
+      },
+    ]);
+    const r = await classifyAbsolute("https://external.example.com", client, opts);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/private or unsupported/);
+  });
 });
 
 // ---------- classifyRelative + checkLinks (fixtures) ----------
@@ -265,6 +304,15 @@ describe("classifyRelative and checkLinks", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("classifyRelative rejects paths that escape the repo root", async () => {
+    const from = join(root, "sub/source.md");
+    await mkdir(join(root, "sub"));
+    await writeFile(from, "x");
+    const r = await classifyRelative("../../../../etc/passwd", from, root);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/escapes repo root/);
+  });
+
   it("checkLinks walks markdown, skips code fences, reports broken URLs and files", async () => {
     await writeFile(
       join(root, "README.md"),
@@ -299,5 +347,22 @@ describe("classifyRelative and checkLinks", () => {
       "absolute:https://bad.example.com",
       "relative:./nope.md",
     ]);
+  });
+
+  it("reports protocol-relative URLs as broken without fetching", async () => {
+    await writeFile(
+      join(root, "README.md"),
+      "[x](//cdn.example.com/a.js)",
+    );
+    let fetched = false;
+    const http: HttpClient = async () => {
+      fetched = true;
+      return new Response(null, { status: 200 });
+    };
+    const broken = await checkLinks({ repoRoot: root, http, retries: 0 });
+    expect(fetched).toBe(false);
+    expect(broken).toHaveLength(1);
+    expect(broken[0]?.reason).toBe("URL missing scheme");
+    expect(broken[0]?.kind).toBe("absolute");
   });
 });

@@ -60,13 +60,20 @@ export function initialState(): State {
   return { runCount: 0, knownBroken: {} };
 }
 
+// State entries are keyed by url + file so the same broken URL can be tracked
+// independently in multiple files within a repo. Line number is deliberately
+// excluded so minor edits above a link don't reset debounce.
+export function keyFor(f: Pick<Finding, "url" | "file">): string {
+  return `${f.url}\t${f.file}`;
+}
+
 export function reconcileState(input: ReconcileInput): ReconcileOutput {
   const { findings, trackingIssueState, prevState } = input;
 
   let prevKnown = prevState.knownBroken;
   let trackingIssueNumber = prevState.trackingIssueNumber;
 
-  // Human closed the issue → accept and start fresh.
+  // Human closed the issue: accept and start fresh.
   if (trackingIssueState === "closed") {
     prevKnown = {};
     trackingIssueNumber = undefined;
@@ -77,17 +84,18 @@ export function reconcileState(input: ReconcileInput): ReconcileOutput {
   const reported: KnownBroken[] = [];
 
   for (const finding of findings) {
-    const prev = prevKnown[finding.url];
+    const key = keyFor(finding);
+    const prev = prevKnown[key];
     if (prev !== undefined) {
       const entry: KnownBroken = {
         ...finding,
         firstSeenRun: prev.firstSeenRun,
         reportedInRun: prev.reportedInRun ?? runCount,
       };
-      nextKnown[finding.url] = entry;
+      nextKnown[key] = entry;
       reported.push(entry);
     } else {
-      nextKnown[finding.url] = { ...finding, firstSeenRun: runCount };
+      nextKnown[key] = { ...finding, firstSeenRun: runCount };
     }
   }
 

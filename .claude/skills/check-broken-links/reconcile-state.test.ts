@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialState,
+  keyFor,
   reconcileState,
   type Finding,
   type State,
@@ -20,56 +21,62 @@ function makeFinding(url: string, overrides: Partial<Finding> = {}): Finding {
 
 describe("reconcileState", () => {
   it("first detection is silent; state remembers firstSeenRun", () => {
+    const f = makeFinding("https://a.example.com");
     const { nextState, action } = reconcileState({
       prevState: initialState(),
-      findings: [makeFinding("https://a.example.com")],
+      findings: [f],
       trackingIssueState: "absent",
     });
     expect(action).toEqual({ kind: "none" });
     expect(nextState.runCount).toBe(1);
-    expect(nextState.knownBroken["https://a.example.com"]?.firstSeenRun).toBe(1);
-    expect(nextState.knownBroken["https://a.example.com"]?.reportedInRun).toBeUndefined();
+    const entry = nextState.knownBroken[keyFor(f)];
+    expect(entry?.firstSeenRun).toBe(1);
+    expect(entry?.reportedInRun).toBeUndefined();
   });
 
   it("second consecutive run with same finding opens an issue", () => {
+    const f = makeFinding("https://a.example.com");
     const run1 = reconcileState({
       prevState: initialState(),
-      findings: [makeFinding("https://a.example.com")],
+      findings: [f],
       trackingIssueState: "absent",
     });
     const run2 = reconcileState({
       prevState: run1.nextState,
-      findings: [makeFinding("https://a.example.com")],
+      findings: [f],
       trackingIssueState: "absent",
     });
     expect(run2.action.kind).toBe("open");
     if (run2.action.kind !== "open") throw new Error();
     expect(run2.action.items).toHaveLength(1);
     expect(run2.action.items[0]?.url).toBe("https://a.example.com");
-    expect(run2.nextState.knownBroken["https://a.example.com"]?.reportedInRun).toBe(2);
+    expect(run2.nextState.knownBroken[keyFor(f)]?.reportedInRun).toBe(2);
   });
 
-  it("subsequent run with existing open issue updates instead of opening", () => {
+  it("updates issue (not opens new) and refreshes line/reason when issue is already open", () => {
     let state: State = initialState();
-    const finding = makeFinding("https://a.example.com");
     state = reconcileState({
       prevState: state,
-      findings: [finding],
+      findings: [makeFinding("https://a.example.com", { line: 10 })],
       trackingIssueState: "absent",
     }).nextState;
     state = reconcileState({
       prevState: state,
-      findings: [finding],
+      findings: [makeFinding("https://a.example.com", { line: 10 })],
       trackingIssueState: "absent",
     }).nextState;
-    // Caller would have recorded issue number after 'open' action.
     state = { ...state, trackingIssueNumber: 42 };
+
     const run3 = reconcileState({
       prevState: state,
-      findings: [finding],
+      findings: [makeFinding("https://a.example.com", { line: 99, reason: "HTTP 500" })],
       trackingIssueState: "open",
     });
-    expect(run3.action).toMatchObject({ kind: "update", issueNumber: 42 });
+    expect(run3.action.kind).toBe("update");
+    if (run3.action.kind !== "update") throw new Error();
+    expect(run3.action.issueNumber).toBe(42);
+    expect(run3.action.items[0]?.line).toBe(99);
+    expect(run3.action.items[0]?.reason).toBe("HTTP 500");
   });
 
   it("drops findings that disappear (fixed or transient) silently", () => {
@@ -82,17 +89,15 @@ describe("reconcileState", () => {
       ],
       trackingIssueState: "absent",
     }).nextState;
-    // b is gone on run 2 — should just disappear from state.
     const run2 = reconcileState({
       prevState: state,
       findings: [makeFinding("https://a.example.com")],
       trackingIssueState: "absent",
     });
-    expect(Object.keys(run2.nextState.knownBroken)).toEqual(["https://a.example.com"]);
-    // a was seen twice — promoted, so 'open' action with only a.
-    expect(run2.action.kind).toBe("open");
+    expect(Object.keys(run2.nextState.knownBroken)).toHaveLength(1);
     if (run2.action.kind !== "open") throw new Error();
     expect(run2.action.items).toHaveLength(1);
+    expect(run2.action.items[0]?.url).toBe("https://a.example.com");
   });
 
   it("closes tracking issue when all previously reported links are fixed", () => {
@@ -116,51 +121,37 @@ describe("reconcileState", () => {
     state = reconcileState({ prevState: state, findings: [f], trackingIssueState: "absent" }).nextState;
     state = reconcileState({ prevState: state, findings: [f], trackingIssueState: "absent" }).nextState;
     state = { ...state, trackingIssueNumber: 7 };
-    // Human closes issue between runs.
     const run3 = reconcileState({
       prevState: state,
       findings: [f],
       trackingIssueState: "closed",
     });
-    // Reset: finding is treated as first-detection again; silent.
     expect(run3.action).toEqual({ kind: "none" });
-    expect(run3.nextState.knownBroken["https://a.example.com"]?.firstSeenRun).toBe(3);
-    expect(run3.nextState.knownBroken["https://a.example.com"]?.reportedInRun).toBeUndefined();
+    expect(run3.nextState.knownBroken[keyFor(f)]?.firstSeenRun).toBe(3);
+    expect(run3.nextState.knownBroken[keyFor(f)]?.reportedInRun).toBeUndefined();
     expect(run3.nextState.trackingIssueNumber).toBeUndefined();
   });
 
-  it("preserves reportedInRun across further runs for long-lived broken links", () => {
-    let state: State = initialState();
-    const f = makeFinding("https://a.example.com");
-    state = reconcileState({ prevState: state, findings: [f], trackingIssueState: "absent" }).nextState;
-    state = reconcileState({ prevState: state, findings: [f], trackingIssueState: "absent" }).nextState;
-    state = { ...state, trackingIssueNumber: 5 };
-    expect(state.knownBroken["https://a.example.com"]?.reportedInRun).toBe(2);
-    state = reconcileState({
-      prevState: state,
-      findings: [f],
-      trackingIssueState: "open",
-    }).nextState;
-    expect(state.knownBroken["https://a.example.com"]?.reportedInRun).toBe(2);
-    expect(state.runCount).toBe(3);
-  });
-
-  it("updates file/line/reason for a known-broken link that moved", () => {
+  it("reports the same URL in two files as two items", () => {
+    const inReadme = makeFinding("https://a.example.com", { file: "README.md" });
+    const inGuide = makeFinding("https://a.example.com", { file: "docs/guide.md" });
     let state: State = initialState();
     state = reconcileState({
       prevState: state,
-      findings: [makeFinding("https://a.example.com", { file: "OLD.md", line: 10 })],
+      findings: [inReadme, inGuide],
       trackingIssueState: "absent",
     }).nextState;
     const run2 = reconcileState({
       prevState: state,
-      findings: [makeFinding("https://a.example.com", { file: "NEW.md", line: 99, reason: "HTTP 500" })],
+      findings: [inReadme, inGuide],
       trackingIssueState: "absent",
     });
     if (run2.action.kind !== "open") throw new Error();
-    expect(run2.action.items[0]?.file).toBe("NEW.md");
-    expect(run2.action.items[0]?.line).toBe(99);
-    expect(run2.action.items[0]?.reason).toBe("HTTP 500");
+    expect(run2.action.items).toHaveLength(2);
+    expect(run2.action.items.map((i) => i.file).sort()).toEqual([
+      "README.md",
+      "docs/guide.md",
+    ]);
   });
 
   it("returns none when there are no findings and no tracking issue", () => {

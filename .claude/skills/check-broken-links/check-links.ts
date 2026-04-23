@@ -137,13 +137,13 @@ async function withTimeout<T>(
   ms: number,
 ): Promise<T> {
   const ctrl = new AbortController();
-  const timer = setTimeout(
-    () => ctrl.abort(new Error(`timeout after ${ms}ms`)),
-    ms,
-  );
+  const timer = setTimeout(() => ctrl.abort(), ms);
   timer.unref?.();
   try {
     return await fn(ctrl.signal);
+  } catch (err) {
+    if (ctrl.signal.aborted) throw new Error(`timeout after ${ms}ms`);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -234,6 +234,15 @@ export async function classifyAbsolute(
     if (outcome.kind === "error") {
       return { ok: false, reason: outcome.reason };
     }
+    // Re-check the redirect target against skip rules so external URLs that
+    // redirect to private hosts (SSRF) are treated as broken, not probed.
+    if (shouldSkipUrl(outcome.to)) {
+      return {
+        ok: false,
+        reason: `redirect to private or unsupported target: ${outcome.to}`,
+        status: outcome.status,
+      };
+    }
     current = outcome.to;
   }
   return {
@@ -257,6 +266,11 @@ export async function classifyRelative(
     : isAbsolute(path)
       ? path
       : resolve(dirname(fromFile), path);
+
+  const rel = relative(repoRoot, target);
+  if (rel.startsWith("..") || isAbsolute(rel)) {
+    return { ok: false, reason: `path escapes repo root: ${path}` };
+  }
 
   try {
     await stat(target);
@@ -310,6 +324,19 @@ export async function checkLinks(
     const links = extractLinks(content);
     for (const link of links) {
       if (shouldSkipUrl(link.url, skipPatterns)) continue;
+
+      // Protocol-relative URLs (e.g., `//cdn.example.com/x`) are broken in
+      // markdown: there is no base URL to combine them with.
+      if (link.url.startsWith("//")) {
+        broken.push({
+          file: relative(repoRoot, file),
+          line: link.line,
+          url: link.url,
+          kind: "absolute",
+          reason: "URL missing scheme",
+        });
+        continue;
+      }
 
       const isAbsoluteUrl = /^https?:\/\//i.test(link.url);
       const kind: "absolute" | "relative" = isAbsoluteUrl

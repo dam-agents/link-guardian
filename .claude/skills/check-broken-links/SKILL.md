@@ -41,7 +41,7 @@ For `owner/repo` in the target list:
      --state-file state/repos/<owner>-<repo>.json \
      --out /tmp/findings-<owner>-<repo>.json
    ```
-   (If you do not have a `run.ts` wrapper yet, invoke `checkLinks` inline via `pnpm exec tsx -e '...'` — but prefer adding `run.ts` the first time you need it.)
+   (If you do not have a `run.ts` wrapper yet, invoke `checkLinks` inline via `pnpm exec tsx -e '...'`, but prefer adding `run.ts` the first time you need it.)
 
 3. Determine the tracking issue's current state:
    - If `state/repos/<owner>-<repo>.json` contains a `trackingIssueNumber`, query `gh issue view <n> --repo <owner>/<repo> --json state` to learn whether it is open or closed.
@@ -68,12 +68,12 @@ Close this issue once the links are fixed (or if you've decided they're not wort
 
 ## `docs/index.md`
 
-- [ ] L42 — `https://example.com/gone` — HTTP 404
-- [ ] L87 — `./missing.md` — file not found: ./missing.md
+- [ ] Line 42: `https://example.com/gone` (HTTP 404)
+- [ ] Line 87: `./missing.md` (file not found: ./missing.md)
 
 ## `README.md`
 
-- [ ] L15 — `https://flaky.example.com` — connection refused
+- [ ] Line 15: `https://flaky.example.com` (connection refused)
 ```
 
 Use the issue title `[humr-bot] Broken links in <repo>` so the human recognises it at a glance and so you can find it again if state is lost.
@@ -86,7 +86,7 @@ Use the issue title `[humr-bot] Broken links in <repo>` so the human recognises 
 
 ## Guardrails
 
-- Never push to target repos. Never create branches. Never open pull requests. humr-bot's token is deliberately scoped so these would fail anyway — don't attempt them.
+- Never push to target repos. Never create branches. Never open pull requests. humr-bot's token is deliberately scoped so these would fail anyway; don't attempt them.
 - Do not alter files under `./repos/<owner>/<repo>/` beyond what `git pull` does.
 - Do not spawn long-running processes. Each run should complete in a single sweep.
 
