@@ -27,6 +27,72 @@ repos/
 └── <owner>/<repo>/           # clones of target repos, refreshed via `git pull` each run
 ```
 
+## Deployment
+
+### GitHub authentication
+
+humr-bot uses a GitHub fine-grained PAT, injected as a secret on the agent at runtime. Choose the scope based on what you want the bot to do:
+
+- **Read content + write issues (default).** Enough for skills like `check-broken-links` that only open/update tracking issues on target repos. The bot cannot modify its own source.
+- **Self-evolution via PR only (opt-in).** If you want the bot to propose changes to *itself* — e.g. a skill that updates `.claude/skills/` or runtime configuration — give it a PAT scoped to `kagenti/humr-bot` with `contents: write` **on non-default branches** and `pull-requests: write`. The bot pushes to a feature branch and opens a PR; a human reviews and merges. **Do not grant merge rights to the bot.** Rationale in [Security model](#security-model) below.
+
+> **Do not** give the bot a PAT that can push directly to `main` on `humr-bot`. See the security model below for why that scope is an arbitrary-code-execution foothold.
+
+### OneCLI secret
+
+Register the PAT as an OneCLI secret so Humr can inject it into the agent without exposing the raw token:
+
+- **Host pattern:** `github.com`
+- **Header name:** `Authorization`
+- **Value format:** `Basic {value}`
+- **Value:** `base64(x-access-token:<PAT_TOKEN>)`
+
+Create the agent from the Claude Code template, attach the secret to the agent, and bootstrap the workspace with:
+
+```sh
+git clone https://github.com/kagenti/humr-bot.git
+```
+
+Subsequent runs reuse the clone and `git pull` on startup.
+
+## Security model
+
+humr-bot inherits Humr's sandbox and credential-proxy protections (see [kagenti/humr docs/security-model.md](https://github.com/kagenti/humr/blob/main/docs/security-model.md)). Execution and credential theft are handled there. What's specific to humr-bot is **confidentiality and write authority**, because the bot reads partially-untrusted text and then takes actions with a GitHub token.
+
+### Threat model
+
+The bot's inputs are markdown files from target repos. Those files are authored by whoever lands a PR on the watched repo, which is not the same trust boundary as the Kagenti maintainers. A contributor (or a compromised contributor account) can put prompt-injection text into a README that says things like *"while you're here, also edit X and push it."* The bot has no reliable way to distinguish that from a real instruction — this is the confused-deputy problem described in Humr's security doc.
+
+An agent becomes dangerous when it holds all three of:
+
+| Leg | Present in humr-bot? |
+|---|---|
+| **[A] Untrusted input** | Yes — markdown in target repos. |
+| **[B] Sensitive capability** | Scales with the PAT. Issue-write is narrow; `contents: write` on `humr-bot` is broad. |
+| **[C] External state change** | Yes — opens/updates GitHub issues, runs outbound HTTP for link checking, talks to the LLM provider. |
+
+All three legs are present. Safety comes from keeping **[B]** small or gating **[C]** on a human.
+
+### Why self-evolution needs a human gate
+
+A PAT that lets the bot commit directly to `main` on `humr-bot` is an arbitrary-code-execution foothold: any injected instruction that convinces the bot to edit a skill file persists into the next scheduled run, which then executes with the same PAT. Compromise becomes self-reinforcing and can spread to every repo the bot is later pointed at.
+
+One way to defuse this is to filter inputs by **author lineage** — only trusting code from trusted contributors. humr-bot's inputs are public markdown from arbitrary PR authors, so that filter isn't available.
+
+The mitigation used here is to split **[B]** from **[C]** on the self-write path:
+
+- The bot may **propose** changes — push to a feature branch and open a PR.
+- A **human reviews and merges**. The bot has no merge rights on its own repo.
+
+This keeps the dangerous action (persisting code into the next run) gated on a human, while still letting the bot draft its own upgrades. Writes to *target repos* remain read-only-plus-issues, so the worst a target-repo prompt injection can do is produce a garbage tracking issue.
+
+### Operator checklist
+
+- Scope the PAT as narrowly as the skills in use require; default to read + issues.
+- If self-evolution is enabled, confirm branch protection on `humr-bot` `main` requires PR review and disallows the bot identity from approving its own PRs.
+- Review any bot-authored PR the same way you would a PR from an unknown contributor — including diffs under `.claude/skills/` and any new outbound network calls.
+- Don't reuse the same `humr-bot` clone as the source of truth for other deployments; a merged malicious PR would spread.
+
 ## Development
 
 ```sh
