@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Runtime workspace state. Lives on PVC, never committed.
+state/
+
+# Local target-repo checkouts fetched at run time.
+repos/
+
+.DS_Store
