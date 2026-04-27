@@ -93,7 +93,7 @@ export function extractLinks(markdown: string): ExtractedLink[] {
 // ---------- Skip rules ----------
 
 const PRIVATE_HOST = [
-  /^localhost$/i,
+  /(^|\.)localhost$/i,
   /^127\./,
   /^::1$/,
   /^10\./,
