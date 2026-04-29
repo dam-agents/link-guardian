@@ -92,6 +92,8 @@ describe("shouldSkipUrl", () => {
     ["tel:+1234", true],
     ["file:///etc/passwd", true],
     ["http://localhost:3000", true],
+    ["http://humr.localhost:4444", true],
+    ["http://onecli.localhost:4444/path", true],
     ["http://127.0.0.1/api", true],
     ["https://10.0.0.5/x", true],
     ["https://192.168.1.1/x", true],
