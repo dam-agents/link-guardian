@@ -38,10 +38,9 @@ For `owner/repo` in the target list:
    ```
    pnpm exec tsx .claude/skills/check-broken-links/run.ts \
      --repo-root repos/<owner>/<repo> \
-     --state-file state/repos/<owner>-<repo>.json \
      --out /tmp/findings-<owner>-<repo>.json
    ```
-   (If you do not have a `run.ts` wrapper yet, invoke `checkLinks` inline via `pnpm exec tsx -e '...'`, but prefer adding `run.ts` the first time you need it.)
+   The wrapper writes the `BrokenLink[]` JSON to `--out`. Reconciliation is the next step (below) and runs in-conversation against `state/repos/<owner>-<repo>.json`.
 
 3. Determine the tracking issue's current state:
    - If `state/repos/<owner>-<repo>.json` contains a `trackingIssueNumber`, query `gh issue view <n> --repo <owner>/<repo> --json state` to learn whether it is open or closed.
