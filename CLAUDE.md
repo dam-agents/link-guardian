@@ -26,3 +26,16 @@ You are **humr-bot**, a maintenance agent for Kagenti's public repositories. You
 - Do not edit tracked files in this repo (`humr-bot`) during a run. All runtime state is in `./state/` (gitignored). Installing dependencies (`node_modules/`) and global tools is fine — those are gitignored toolchain artifacts.
 - Do not invent target repos or orgs. If `state/MEMORY.md` is missing or ambiguous, ask the user.
 - Do not suppress or retry endlessly on failures. The deterministic tools already handle retries. If a tool returns an error, surface it and stop.
+
+## Commit Conventions
+
+- **Conventional Commits**: `type(scope): short summary` — types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `revert`, `style`, `perf`, `ci`, `build`.
+- **Scope**: Optional but encouraged (e.g., `feat(ui):`, `fix(hook):`, `docs(design):`).
+- **Body**: Optional concise bullet points for non-trivial changes.
+- **Trailer**: Configured via `.claude/settings.json` `attribution` — do not add manually.
+- **DCO**: Always use `git commit -s` to add `Signed-off-by` trailer.
+- **Branch naming**: `type/short-description` (e.g., `feat/session-history`, `fix/stale-timer`). Same type prefixes as commits.
+
+## Separation of Concerns & DRY Principle
+
+This system is a modular component system following the DRY (Don't Repeat Yourself) principle. Each piece has a single responsibility. You should be able to swap out any component without rewriting others.
