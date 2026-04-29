@@ -9,4 +9,7 @@ state/
 # Local target-repo checkouts fetched at run time.
 repos/
 
+# Local MCP server configuration, populated per-environment.
+.mcp.json
+
 .DS_Store
