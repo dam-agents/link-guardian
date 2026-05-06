@@ -1,8 +1,8 @@
 {
-  "name": "humr-bot",
+  "name": "dam-bot",
   "version": "0.0.0",
   "private": true,
-  "description": "Claude Code agent running as humr-bot. Houses skills the bot performs on a schedule.",
+  "description": "Claude Code agent running as dam-bot. Houses skills the bot performs on a schedule.",
   "type": "module",
   "packageManager": "pnpm@9.12.3",
   "engines": {

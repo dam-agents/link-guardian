@@ -92,7 +92,7 @@ describe("shouldSkipUrl", () => {
     ["tel:+1234", true],
     ["file:///etc/passwd", true],
     ["http://localhost:3000", true],
-    ["http://humr.localhost:4444", true],
+    ["http://dam.localhost:4444", true],
     ["http://onecli.localhost:4444/path", true],
     ["http://127.0.0.1/api", true],
     ["https://10.0.0.5/x", true],
@@ -273,7 +273,7 @@ describe("classifyRelative and checkLinks", () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "humr-bot-test-"));
+    root = await mkdtemp(join(tmpdir(), "dam-bot-test-"));
   });
 
   afterEach(async () => {

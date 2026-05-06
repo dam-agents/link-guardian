@@ -5,7 +5,7 @@ description: Walk markdown in configured repos, classify broken external and rel
 
 # check-broken-links
 
-You are running the broken-link-detection skill for humr-bot. Your job is to scan markdown files in each configured target repo, classify links that are broken, and keep exactly one tracking issue per repo up to date with what needs fixing.
+You are running the broken-link-detection skill for dam-bot. Your job is to scan markdown files in each configured target repo, classify links that are broken, and keep exactly one tracking issue per repo up to date with what needs fixing.
 
 ## State layout
 
@@ -61,9 +61,9 @@ For `owner/repo` in the target list:
 The body is a markdown checklist, one bullet per broken link, grouped by file. Example:
 
 ```markdown
-humr-bot found broken links in this repo's documentation. Each link below has been broken on at least two consecutive runs.
+dam-bot found broken links in this repo's documentation. Each link below has been broken on at least two consecutive runs.
 
-Close this issue once the links are fixed (or if you've decided they're not worth fixing) and humr-bot will stop reporting them.
+Close this issue once the links are fixed (or if you've decided they're not worth fixing) and dam-bot will stop reporting them.
 
 ## `docs/index.md`
 
@@ -75,7 +75,7 @@ Close this issue once the links are fixed (or if you've decided they're not wort
 - [ ] Line 15: `https://flaky.example.com` (connection refused)
 ```
 
-Use the issue title `[humr-bot] Broken links in <repo>` so the human recognises it at a glance and so you can find it again if state is lost.
+Use the issue title `[dam-bot] Broken links in <repo>` so the human recognises it at a glance and so you can find it again if state is lost.
 
 ## Error handling
 
@@ -85,7 +85,7 @@ Use the issue title `[humr-bot] Broken links in <repo>` so the human recognises 
 
 ## Guardrails
 
-- Never push to target repos. Never create branches. Never open pull requests. humr-bot's token is deliberately scoped so these would fail anyway; don't attempt them.
+- Never push to target repos. Never create branches. Never open pull requests. dam-bot's token is deliberately scoped so these would fail anyway; don't attempt them.
 - Do not alter files under `./repos/<owner>/<repo>/` beyond what `git pull` does.
 - Do not spawn long-running processes. Each run should complete in a single sweep.
 
