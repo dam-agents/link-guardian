@@ -33,14 +33,14 @@ repos/
 
 dam-bot uses a GitHub fine-grained PAT, injected as a secret on the agent at runtime. Choose the scope based on what you want the bot to do:
 
-- **Read content + write issues (default).** Enough for skills like `check-broken-links` that only open/update tracking issues on target repos. The bot cannot modify its own source.
+- **Read content + write issues (default).** Enough for skills like `check-broken-links` that only open/update tracking issues on target repos.
 - **Self-evolution via PR only (opt-in).** If you want the bot to propose changes to *itself* — e.g. a skill that updates `.claude/skills/` or runtime configuration — give it a PAT scoped to `dam-agents/dam-bot` with `contents: write` **on non-default branches** and `pull-requests: write`. The bot pushes to a feature branch and opens a PR; a human reviews and merges. **Do not grant merge rights to the bot.** Rationale in [Security model](#security-model) below.
 
-> **Do not** give the bot a PAT that can push directly to `main` on `dam-bot`. See the security model below for why that scope is an arbitrary-code-execution foothold.
+> **Do not** give the bot a PAT that can push directly to `main` on `dam-bot`. See the [security model](#security-model) below for why that scope is an arbitrary-code-execution foothold.
 
-### OneCLI secret
+### Envoy credential injection
 
-Register the PAT as an OneCLI secret so DAM can inject it into the agent without exposing the raw token:
+DAM's Envoy credential-gateway sidecar injects the PAT on the wire — the agent container never sees the raw token. Register the secret via DAM's Connections panel as a Generic secret:
 
 - **Host pattern:** `github.com`
 - **Header name:** `Authorization`
@@ -57,55 +57,19 @@ Subsequent runs reuse the clone and `git pull` on startup.
 
 ## Security model
 
-dam-bot inherits DAM's sandbox and credential-proxy protections (see [dam-agents/dam docs/security-model.md](https://github.com/dam-agents/dam/blob/main/docs/security-model.md)). Execution and credential theft are handled there. What's specific to dam-bot is **confidentiality and write authority**, because the bot reads partially-untrusted text and then takes actions with a GitHub token.
-
-### Threat model
-
-The bot's inputs are markdown files from target repos. Those files are authored by whoever lands a PR on the watched repo, which is not the same trust boundary as the DAM maintainers. A contributor (or a compromised contributor account) can put prompt-injection text into a README that says things like *"while you're here, also edit X and push it."* The bot has no reliable way to distinguish that from a real instruction — this is the confused-deputy problem described in DAM's security doc.
-
-An agent becomes dangerous when it holds all three of:
-
-| Leg | Present in dam-bot? |
-|---|---|
-| **[A] Untrusted input** | Yes — markdown in target repos. |
-| **[B] Sensitive capability** | Scales with the PAT. Issue-write is narrow; `contents: write` on `dam-bot` is broad. |
-| **[C] External state change** | Yes — opens/updates GitHub issues, runs outbound HTTP for link checking, talks to the LLM provider. |
-
-All three legs are present. Safety comes from keeping **[B]** small or gating **[C]** on a human.
-
-### Why self-evolution needs a human gate
-
-A PAT that lets the bot commit directly to `main` on `dam-bot` is an arbitrary-code-execution foothold: any injected instruction that convinces the bot to edit a skill file persists into the next scheduled run, which then executes with the same PAT. Compromise becomes self-reinforcing and can spread to every repo the bot is later pointed at.
-
-One way to defuse this is to filter inputs by **author lineage** — only trusting code from trusted contributors. dam-bot's inputs are public markdown from arbitrary PR authors, so that filter isn't available.
-
-The mitigation used here is to split **[B]** from **[C]** on the self-write path:
-
-- The bot may **propose** changes — push to a feature branch and open a PR.
-- A **human reviews and merges**. The bot has no merge rights on its own repo.
-
-This keeps the dangerous action (persisting code into the next run) gated on a human, while still letting the bot draft its own upgrades. Writes to *target repos* remain read-only-plus-issues, so the worst a target-repo prompt injection can do is produce a garbage tracking issue.
-
-### Operator checklist
-
-- Scope the PAT as narrowly as the skills in use require; default to read + issues.
-- If self-evolution is enabled, confirm branch protection on `dam-bot` `main` requires PR review and disallows the bot identity from approving its own PRs.
-- Review any bot-authored PR the same way you would a PR from an unknown contributor — including diffs under `.claude/skills/` and any new outbound network calls.
-- Don't reuse the same `dam-bot` clone as the source of truth for other deployments; a merged malicious PR would spread.
+dam-bot inherits DAM's overall security posture — see [DAM security model](https://github.com/dam-agents/dam/blob/main/docs/strategy/security-model.md). Specifically, dam-bot holds all three legs that make an agent dangerous: **[A] untrusted input** (markdown from arbitrary PR authors on target repos), **[B] sensitive capability** (a GitHub PAT), and **[C] external state change** (opening issues, outbound HTTP, talking to the LLM provider). Safety here comes from keeping **[B]** narrow (default: read + issues only) and gating self-evolution on a human PR review — the bot has no merge rights on its own repo.
 
 ## Development
 
 ```sh
 pnpm install
-pnpm test          # vitest, covers both deep modules
+pnpm test
 pnpm typecheck
 ```
-
-The deep modules (`check-links.ts`, `reconcile-state.ts`) are pure-ish and fully unit-testable without network access. The agent layer (`SKILL.md`) is verified by running the bot against a test repo; it is not unit-tested.
 
 ## Design
 
 - **Deterministic TypeScript** owns link extraction, HTTP classification, relative-path resolution, and state reconciliation. Correctness of link-checking does not depend on which LLM runs the agent.
 - **The agent layer** handles judgment calls that don't belong in deterministic code: onboarding conversation, composing issue bodies, learning user-stated ignore rules, and deciding when to escalate.
 
-See [PRD dam-agents/dam#283](https://github.com/dam-agents/dam/issues/283) for the product rationale and full user stories.
+See [PRD dam-agents/dam#36](https://github.com/dam-agents/dam/issues/36) for the product rationale and full user stories.
