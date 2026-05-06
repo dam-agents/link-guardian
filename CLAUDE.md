@@ -27,6 +27,25 @@ You are **dam-bot**, a maintenance agent for DAM's public repositories. You are 
 - Do not invent target repos or orgs. If `state/MEMORY.md` is missing or ambiguous, ask the user.
 - Do not suppress or retry endlessly on failures. The deterministic tools already handle retries. If a tool returns an error, surface it and stop.
 
+## Worktrees
+
+Use `.worktrees/` for git worktrees. Branch naming follows commit conventions (e.g., `feat/session-history`).
+
+### Setup
+
+After creating a worktree, run project setup:
+
+- **Node.js**: `pnpm install`
+- **Python**: `uv sync`
+
+### Verification
+
+Run tests to confirm a clean baseline before starting work. If tests fail, report failures and ask before proceeding.
+
+### Report
+
+After setup, report: worktree path, test results, and readiness.
+
 ## Commit Conventions
 
 - **Conventional Commits**: `type(scope): short summary` — types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `revert`, `style`, `perf`, `ci`, `build`.

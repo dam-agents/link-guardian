@@ -1,7 +1,47 @@
+# Dependencies
 node_modules/
+jspm_packages/
+.pnpm-store/
+
+# Build output
 dist/
+build/
+out/
+*.tsbuildinfo
+
+# Test / coverage
 coverage/
+.nyc_output/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Caches
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Git worktrees
+.worktrees/
 
 # Runtime workspace state. Lives on PVC, never committed.
 state/
@@ -11,5 +51,3 @@ repos/
 
 # Local MCP server configuration, populated per-environment.
 .mcp.json
-
-.DS_Store

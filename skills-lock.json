@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "align-repo": {
+      "source": "apocohq/skills",
+      "sourceType": "github",
+      "skillPath": "skills/align-repo/SKILL.md",
+      "computedHash": "17163b8a20e2cea00079f7ed5904a338b9c91e47d8a5ee5a9312845bed6e96e9"
+    },
+    "review-work": {
+      "source": "apocohq/skills",
+      "sourceType": "github",
+      "skillPath": "skills/review-work/SKILL.md",
+      "computedHash": "0cbd00ca317e5b2d0c1953596a8fa99f68f0e9cb81318a6ca707db64a17333eb"
+    }
+  }
+}
