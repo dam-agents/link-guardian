@@ -6,6 +6,7 @@ import {
   checkLinks,
   classifyAbsolute,
   classifyRelative,
+  describeFetchError,
   extractLinks,
   shouldSkipUrl,
   type HttpClient,
@@ -111,6 +112,34 @@ describe("shouldSkipUrl", () => {
 
   it("honours extra patterns", () => {
     expect(shouldSkipUrl("https://flaky.example.com/x", [/flaky\.example\.com/])).toBe(true);
+  });
+});
+
+// ---------- describeFetchError ----------
+
+describe("describeFetchError", () => {
+  it("returns plain message when there is no cause", () => {
+    expect(describeFetchError(new Error("dns failure"))).toBe("dns failure");
+  });
+
+  it("appends cause.code when present", () => {
+    const err = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect ECONNRESET"), {
+        code: "ECONNRESET",
+      }),
+    });
+    expect(describeFetchError(err)).toBe("fetch failed: ECONNRESET");
+  });
+
+  it("falls back to cause.message when there is no code", () => {
+    const err = new TypeError("fetch failed", {
+      cause: new Error("self signed certificate"),
+    });
+    expect(describeFetchError(err)).toBe("fetch failed: self signed certificate");
+  });
+
+  it("stringifies non-Error throwables", () => {
+    expect(describeFetchError("boom")).toBe("boom");
   });
 });
 
@@ -225,6 +254,23 @@ describe("classifyAbsolute", () => {
     const r = await classifyAbsolute("https://dead.example.com", client, opts);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("dns failure");
+  });
+
+  it("surfaces err.cause.code from Node fetch failures", async () => {
+    const fetchErr = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("getaddrinfo ENOTFOUND dead.example.com"), {
+        code: "ENOTFOUND",
+      }),
+    });
+    const { client } = fakeHttp([
+      { method: "HEAD", response: fetchErr },
+      { method: "HEAD", response: fetchErr },
+      { method: "GET", response: fetchErr },
+      { method: "GET", response: fetchErr },
+    ]);
+    const r = await classifyAbsolute("https://dead.example.com", client, opts);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("fetch failed: ENOTFOUND");
   });
 
   it("reports broken when 5xx keeps failing after retry", async () => {
