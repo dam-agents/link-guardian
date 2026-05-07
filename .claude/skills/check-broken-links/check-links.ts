@@ -143,6 +143,23 @@ type Outcome =
   | { kind: "redirect"; to: string; status: number }
   | { kind: "error"; reason: string };
 
+// Node's fetch rejects with `TypeError: fetch failed` and stashes the real
+// cause (DNS, TLS, ECONNRESET, …) on `err.cause`. Surface it so failures are
+// distinguishable in state and tracking issues.
+export function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const cause = (err as { cause?: unknown }).cause;
+  if (cause && typeof cause === "object") {
+    const code = (cause as { code?: unknown }).code;
+    if (typeof code === "string" && code) return `${err.message}: ${code}`;
+    const causeMsg = (cause as { message?: unknown }).message;
+    if (typeof causeMsg === "string" && causeMsg) {
+      return `${err.message}: ${causeMsg}`;
+    }
+  }
+  return err.message;
+}
+
 async function withTimeout<T>(
   fn: (signal: AbortSignal) => Promise<T>,
   ms: number,
@@ -176,7 +193,7 @@ async function performRequest(
           opts.timeoutMs,
         );
       } catch (err) {
-        lastError = (err as Error).message;
+        lastError = describeFetchError(err);
         continue;
       }
 
