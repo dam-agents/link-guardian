@@ -34,54 +34,67 @@ For `owner/repo` in the target list:
 
 1. Ensure a local clone exists at `./repos/<owner>/<repo>/`. If missing, `gh repo clone <owner>/<repo> repos/<owner>/<repo>`. If present, `git -C repos/<owner>/<repo> pull --ff-only`.
 
-2. Run the link checker:
+2. Determine the tracking issue's current state. This is the only piece the wrapper cannot compute itself:
+   - If `state/repos/<owner>-<repo>.json` exists and contains a `trackingIssueNumber`, query `gh issue view <n> --repo <owner>/<repo> --json state --jq .state` and map `OPEN`→`open`, `CLOSED`→`closed`.
+   - Otherwise, run the **title-based lookup** below before falling back to `absent`.
+
+   **2a. Title-based lookup (state-loss recovery).** If the state file is missing or has no `trackingIssueNumber`, search the target repo for an existing tracking issue by title before opening a new one. The title is stable (`[Bug]: broken links in <repo>`), so this prevents duplicate issues when state is lost (e.g., PVC re-mount, accidental clear).
+   ```
+   gh issue list --repo <owner>/<repo> \
+     --search '"[Bug]: broken links in <repo>" in:title' \
+     --state all --limit 5 --json number,state,title
+   ```
+   Filter the result to entries where `title` exactly equals `[Bug]: broken links in <repo>` (the `--search` is fuzzy):
+   - **No match** → use `absent`.
+   - **One open match** → use `open`, and patch `trackingIssueNumber: <n>` into `state/repos/<owner>-<repo>.json` *before* running the wrapper, so the wrapper carries the number into next state.
+   - **One closed match** → use `closed`. Do not patch the number; the wrapper resets debounce on closed and a new issue (if needed) will be opened next.
+   - **Multiple matches** (rare — humans opened a duplicate) → log the issue numbers, skip this repo, and surface to the user. Do not guess.
+
+3. Run the sweep wrapper. It reads prior state, scans links, reconciles, persists next state, renders the issue body, and emits an action plan:
    ```
    pnpm exec tsx .claude/skills/check-broken-links/run.ts \
      --repo-root repos/<owner>/<repo> \
-     --out /tmp/findings-<owner>-<repo>.json
+     --repo-name <repo> \
+     --state-file state/repos/<owner>-<repo>.json \
+     --tracking-issue-state <open|closed|absent> \
+     --plan-out /tmp/plan-<owner>-<repo>.json \
+     --body-out /tmp/body-<owner>-<repo>.md
    ```
-   The wrapper writes the `BrokenLink[]` JSON to `--out`. Reconciliation is the next step (below) and runs in-conversation against `state/repos/<owner>-<repo>.json`.
 
-3. Determine the tracking issue's current state:
-   - If `state/repos/<owner>-<repo>.json` contains a `trackingIssueNumber`, query `gh issue view <n> --repo <owner>/<repo> --json state` to learn whether it is open or closed.
-   - Otherwise, the state is `absent`.
-
-4. Call `reconcileState` with `{ prevState, findings, trackingIssueState }`. It returns `{ nextState, action }`.
-
-5. Execute the action:
+4. Read the plan JSON at `--plan-out` and execute its `kind`:
    - `none` — do nothing.
-   - `open` — create a new issue in the target repo with the body composed from `items` (see "Issue body format" below). Record the returned issue number into `nextState.trackingIssueNumber`.
-   - `update` — rewrite the body of `issueNumber` with the new item list. Use `gh issue edit <n> --repo <owner>/<repo> --body-file <file>`.
-   - `close` — `gh issue close <n> --repo <owner>/<repo> --comment "All previously reported links now resolve. Closing."`
+   - `open` — `gh issue create --repo <owner>/<repo> --title "<plan.title>" --body-file <plan.bodyFile>`. Capture the new issue number `n` from the URL, then patch the state file: set `trackingIssueNumber` to `n` in `state/repos/<owner>-<repo>.json`.
+   - `update` — `gh issue edit <plan.issueNumber> --repo <owner>/<repo> --body-file <plan.bodyFile>`.
+   - `close` — `gh issue close <plan.issueNumber> --repo <owner>/<repo> --comment "<plan.comment>"`.
 
-6. Persist `nextState` to `state/repos/<owner>-<repo>.json`.
+   The wrapper has already written the next state for you, except for the `trackingIssueNumber` patch in the `open` case (deliberate — written only after `gh issue create` succeeds, so a failed call leaves the state recoverable).
 
-## Issue body format
+## Issue title and body format
 
-The body is a markdown checklist, one bullet per broken link, grouped by file. Example:
+Title: `[Bug]: broken links in <repo>`. The wrapper composes this from `--repo-name`. Keep the format stable so humans recognise it at a glance.
+
+Body (rendered by `renderIssueBody` in `render.ts`, written to `--body-out`): a markdown checklist, one bullet per broken link, grouped by file, files sorted alphabetically and lines numerically. Example:
 
 ```markdown
 dam-bot found broken links in this repo's documentation. Each link below has been broken on at least two consecutive runs.
 
 Close this issue once the links are fixed (or if you've decided they're not worth fixing) and dam-bot will stop reporting them.
 
-## `docs/index.md`
-
-- [ ] Line 42: `https://example.com/gone` (HTTP 404)
-- [ ] Line 87: `./missing.md` (file not found: ./missing.md)
-
 ## `README.md`
 
 - [ ] Line 15: `https://flaky.example.com` (connection refused)
-```
 
-Use the issue title `[dam-bot] Broken links in <repo>` so the human recognises it at a glance and so you can find it again if state is lost.
+## `docs/index.md`
+
+- [ ] Line 42: `https://example.com/gone` (HTTP 404)
+- [ ] Line 87: `./missing.md` (file not found)
+```
 
 ## Error handling
 
 - If `gh repo clone` or `git pull` fails for a repo, log the error, skip that repo, and continue with the next. Do not delete the local state.
-- If `gh issue create/edit/close` fails, log the error and leave `state/repos/<owner>-<repo>.json` unchanged for that repo so the action is retried next run.
-- If `checkLinks` throws, stop that repo (same policy as above).
+- If the wrapper itself throws (bad clone, malformed state file, etc.), log and skip that repo. State is left as it was on disk before the wrapper ran.
+- If a `gh issue create/edit/close` call fails *after* the wrapper succeeded, log the error and continue. The wrapper has already advanced `state/repos/<owner>-<repo>.json`, but reconciliation is idempotent over the same findings, so the next run will produce the same action and retry. Exception: for a failed `open`, do not patch `trackingIssueNumber` — without it, the next run will treat the issue as `absent` and try `open` again.
 
 ## Guardrails
 
