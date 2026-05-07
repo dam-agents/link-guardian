@@ -10,11 +10,6 @@ Each chore the bot knows how to do is a **skill**, and skills live in `.claude/s
 
 dam-bot is also designed to **evolve itself**: it can propose new skills (or fixes to existing ones) as pull requests against this repo. A human reviews and merges. Today only `check-broken-links` ships, but the whole architecture — the way runs are scoped, the way credentials are handled, the [security model](#security-model) below — is shaped by that self-evolution loop.
 
-The bot also has two distinct kinds of memory:
-
-- **Runtime state** (config, learned ignore rules, debounce counters) lives in `./state/` on a persistent volume. Gitignored, never committed.
-- **Code changes** (new skills, edits to existing ones) live in tracked files in this repo. The bot can only change them via PR — never direct push.
-
 ## How DAM runs it
 
 DAM is the scheduler. On a timer (usually once a day) it starts the bot, opens this repo as the bot's working directory, and points it at a skill. The bot is a Claude Code session — it reads the skill's `SKILL.md` and runs the small TypeScript helpers next to it via `pnpm exec tsx`.
@@ -38,12 +33,10 @@ repos/
 
 ### Giving the bot a GitHub token
 
-The bot talks to GitHub on your behalf. To do that it needs a **fine-grained personal access token** (PAT) — a long string from GitHub that says "whoever holds this is allowed to do exactly these things on exactly these repos." You decide what the bot is allowed to do:
+The bot talks to GitHub on your behalf. To do that it needs a **fine-grained personal access token** (PAT) — a token GitHub gives you, scoped per-repo. You decide what the bot is allowed to do:
 
 - **Default — read code + write issues.** Enough for `check-broken-links` and any other skill that only reads files and files reports as issues. Recommended.
-- **Self-improvement (opt-in).** If you want the bot to propose changes to *its own* code — a new skill, a config tweak — give it a token scoped to `dam-agents/dam-bot` with `contents: write` and `pull-requests: write`. Then **protect `main` on `dam-bot`** with a branch protection rule (or ruleset): require PR review, disallow direct pushes, disallow force-pushes. Fine-grained PATs can't be scoped to specific branches, so `contents: write` is necessarily repo-wide — the protection rule is what actually keeps the bot out of `main`. See [Security model](#security-model) below.
-
-> **Don't skip the branch protection step.** The bot's PAT is technically allowed to push to `main`; the protection rule is the only thing that rejects the push.
+- **Self-improvement (opt-in).** If you want the bot to propose changes to *its own* code — a new skill, a config tweak — give it a token scoped with `contents: write` and `pull-requests: write`. Then **protect `main` on `dam-bot`** with a branch protection rule (or ruleset): require PR review, disallow direct pushes, disallow force-pushes. Fine-grained PATs can't be scoped to specific branches, so `contents: write` is necessarily repo-wide — the protection rule is what actually keeps the bot out of `main`. See [Security model](#security-model) below.
 
 ### How the bot uses the token without seeing it
 
@@ -78,7 +71,7 @@ The standard framing is the three legs that, when held together, make an agent e
 
 For chore runs (like `check-broken-links`), dam-bot has **[A]** and **[C]** but essentially not **[B]**. With no sensitive data on hand, the worst a tricked bot can do is open a garbage issue — a human can close it in seconds. Anything the bot "learns" during a chore run (e.g., a domain to ignore) goes into `./state/`, never into tracked code.
 
-For self-evolution runs, the risk shape is *code persistence*: a malicious instruction that convinced the bot to write a bad skill would persist into the next scheduled run, and from there could spread to every repo the bot is later pointed at. The mitigation is the human review gate: the bot can only **propose** changes via pull request, never merge. The fence isn't in the token — fine-grained PATs can't restrict `contents: write` to a subset of branches — it's in **branch protection on `main`**, which rejects any push the bot tries to make there.
+For self-evolution runs, the risk shape is *code persistence*: a malicious instruction that convinced the bot to write a bad skill would persist into the next scheduled run, and from there could spread to every repo the bot is later pointed at. The mitigation is the human review gate: the bot can only **propose** changes via pull request, never merge. The fence is **branch protection on `main`**, not the token.
 
 ## Development
 
