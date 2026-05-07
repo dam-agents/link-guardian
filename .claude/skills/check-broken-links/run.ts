@@ -6,7 +6,7 @@
  * body if needed, and emits an action plan for the caller to execute via gh.
  *
  * Usage:
- *   pnpm exec tsx .claude/skills/check-broken-links/run.ts \
+ *   npx tsx .claude/skills/check-broken-links/run.ts \
  *     --repo-root <path> \
  *     --state-file <path> \
  *     --tracking-issue-state <open|closed|absent> \

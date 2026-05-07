@@ -4,7 +4,6 @@
   "private": true,
   "description": "Claude Code agent running as dam-bot. Houses skills the bot performs on a schedule.",
   "type": "module",
-  "packageManager": "pnpm@9.12.3",
   "engines": {
     "node": ">=20"
   },

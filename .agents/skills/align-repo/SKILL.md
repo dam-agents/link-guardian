@@ -81,7 +81,7 @@ Use `.worktrees/` for git worktrees. Branch naming follows commit conventions (e
 
 After creating a worktree, run project setup:
 
-- **Node.js**: `pnpm install`
+- **Node.js**: `npm install`
 - **Python**: `uv sync`
 
 ### Verification

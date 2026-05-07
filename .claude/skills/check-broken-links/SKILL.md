@@ -58,7 +58,7 @@ For any comment that says "ignore X" (e.g. *"ignore flaky.example.com, it rotate
 
 **d. Run the wrapper:**
 ```
-pnpm exec tsx .claude/skills/check-broken-links/run.ts \
+npx tsx .claude/skills/check-broken-links/run.ts \
   --repo-root repos/<owner>/<repo> \
   --state-file state/repos/<owner>-<repo>.json \
   --tracking-issue-state <open|closed|absent> \

@@ -12,7 +12,7 @@ dam-bot is also designed to **evolve itself**: it can propose new skills (or fix
 
 ## How DAM runs it
 
-DAM is the scheduler. On a timer (usually once a day) it starts the bot, opens this repo as the bot's working directory, and points it at a skill. The bot is a Claude Code session — it reads the skill's `SKILL.md` and runs the small TypeScript helpers next to it via `pnpm exec tsx`.
+DAM is the scheduler. On a timer (usually once a day) it starts the bot, opens this repo as the bot's working directory, and points it at a skill. The bot is a Claude Code session — it reads the skill's `SKILL.md` and runs the small TypeScript helpers next to it via `npx tsx`.
 
 The bot needs to remember things between runs ("I already opened issue #42 for repo X yesterday"). That memory lives in a folder called `state/`. The folder is mounted from outside the container, so it survives restarts and reschedulings. It's gitignored — never committed back to this repo.
 
@@ -76,9 +76,9 @@ For self-evolution runs, the risk shape is *code persistence*: a malicious instr
 ## Development
 
 ```sh
-pnpm install
-pnpm test
-pnpm typecheck
+npm install
+npm test
+npm run typecheck
 ```
 
 ## Design

@@ -7,7 +7,7 @@ You are **dam-bot**, a maintenance agent for DAM's public repositories.
 1. A persistent volume is mounted at `./state/`. It is the only place you write durable state.
 2. Target repositories you operate on are cloned into `./repos/<owner>/<repo>/` at runtime. Use `git pull` when the clone already exists.
 3. Authenticate to GitHub via `gh`. The CLI is preconfigured with dam-bot's fine-grained token by DAM's credential plane. Do not prompt for credentials.
-4. Bootstrap the Node toolchain on first run if missing: `npm install -g pnpm@<version from package.json's packageManager field>`, then `pnpm install --frozen-lockfile` in this repo. Both `pnpm` and `node_modules/` are runtime artifacts (gitignored).
+4. Install dependencies on first run: `npm ci`. `node_modules/` is a runtime artifact (gitignored).
 
 ## Global conventions
 
@@ -29,7 +29,7 @@ Use `.worktrees/` for git worktrees. Branch naming follows commit conventions (e
 
 After creating a worktree, run project setup:
 
-- **Node.js**: `pnpm install`
+- **Node.js**: `npm install`
 - **Python**: `uv sync`
 
 ### Verification
