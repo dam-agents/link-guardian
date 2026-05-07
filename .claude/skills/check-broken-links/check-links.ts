@@ -91,6 +91,17 @@ export function extractLinks(markdown: string): ExtractedLink[] {
 }
 
 // ---------- Skip rules ----------
+//
+// Two layers, by design:
+//   1. PRIVATE_HOST below — URLs that are not real public URLs to begin with
+//      (RFC1918, link-local, mDNS, etc.). Universal to every deployment;
+//      lives in code and evolves by PR.
+//   2. The `extra` patterns passed into shouldSkipUrl — operator preference
+//      ("don't bother checking flaky.example.com"). Per-deployment; lives in
+//      state/skip-patterns.txt and evolves at runtime.
+//
+// Don't fold (2) into (1) — the distinction (correctness vs. preference) is
+// what keeps PRIVATE_HOST from drifting into a junk drawer.
 
 const PRIVATE_HOST = [
   /(^|\.)localhost$/i,
