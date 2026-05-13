@@ -46,7 +46,9 @@ For `owner/repo` in the target list:
   Filter to entries where `title` exactly equals `[Bug]: broken links` (the search is fuzzy):
   - **No match** → `absent`.
   - **One open match** → `open`. Patch `trackingIssueNumber: <n>` into the state file before running the wrapper.
-  - **One closed match** → `closed`. Don't patch (wrapper resets on closed).
+  - **One closed match** → check `state.lastProcessedClosedIssueNumber`:
+    - Matches `<n>` → the reset for this issue was already applied on a prior run; treat as `absent`.
+    - Does not match (or field absent) → `closed`. Don't patch `trackingIssueNumber` (wrapper resets on closed).
   - **Multiple matches** → log numbers, skip the repo, surface to user. Don't guess.
 
 **c. Scan tracking issue comments for ignore directives** (only if state is `open` or `closed`):
@@ -76,6 +78,8 @@ The wrapper reads prior state, scans links, reconciles, persists next state, and
 - `close` → `gh issue close <plan.issueNumber> --repo <owner>/<repo> --comment "<plan.comment>"`.
 
 The wrapper deliberately omits `trackingIssueNumber` from the open-case state file. Patch it in only after `gh issue create` succeeds; a failed call leaves state recoverable.
+
+**f. After a `closed` run:** patch `lastProcessedClosedIssueNumber: <n>` into the state file (where `<n>` is the issue number found in step 2b). This marks the reset as done so future title-based lookups for the same closed issue return `absent` instead of re-triggering the reset.
 
 ## Issue title
 
