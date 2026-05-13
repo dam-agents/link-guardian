@@ -34,6 +34,10 @@ export interface KnownBroken extends Finding {
 export interface State {
   runCount: number;
   trackingIssueNumber?: number;
+  // Issue number whose closure triggered the last debounce reset. The run loop
+  // checks this to avoid re-firing the reset on every subsequent scan of the
+  // same permanently-closed issue.
+  lastProcessedClosedIssueNumber?: number;
   knownBroken: Record<string, KnownBroken>;
 }
 
@@ -99,10 +103,14 @@ export function reconcileState(input: ReconcileInput): ReconcileOutput {
     }
   }
 
+  const { lastProcessedClosedIssueNumber } = prevState;
   const nextState: State = {
     runCount,
     knownBroken: nextKnown,
     ...(trackingIssueNumber !== undefined && { trackingIssueNumber }),
+    ...(lastProcessedClosedIssueNumber !== undefined && {
+      lastProcessedClosedIssueNumber,
+    }),
   };
 
   let action: Action;
