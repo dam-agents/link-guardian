@@ -319,7 +319,7 @@ describe("classifyRelative and checkLinks", () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(join(tmpdir(), "dam-bot-test-"));
+    root = await mkdtemp(join(tmpdir(), "link-guardian-test-"));
   });
 
   afterEach(async () => {
