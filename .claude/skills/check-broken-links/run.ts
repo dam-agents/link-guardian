@@ -38,8 +38,8 @@ import {
 const ISSUE_TITLE = "[Bug]: broken links";
 
 const ISSUE_PREAMBLE =
-  "dam-bot found broken links in this repo's documentation. Each link below has been broken on at least two consecutive runs.\n\n" +
-  "Close this issue once the links are fixed (or if you've decided they're not worth fixing) and dam-bot will stop reporting them.";
+  "link-guardian found broken links in this repo's documentation. Each link below has been broken on at least two consecutive runs.\n\n" +
+  "Close this issue once the links are fixed (or if you've decided they're not worth fixing) and link-guardian will stop reporting them.";
 
 const COLLAPSE_THRESHOLD = 5;
 

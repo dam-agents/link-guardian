@@ -1,8 +1,8 @@
 {
-  "name": "dam-bot",
+  "name": "link-guardian",
   "version": "0.0.0",
   "private": true,
-  "description": "Claude Code agent running as dam-bot. Houses skills the bot performs on a schedule.",
+  "description": "Claude Code agent that watches DAM's public repos for broken links and other doc rot.",
   "type": "module",
   "engines": {
     "node": ">=20"
