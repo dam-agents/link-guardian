@@ -49,7 +49,7 @@ For `owner/repo` in the target list:
   - **One closed match** → check `state.lastProcessedClosedIssueNumber`:
     - Matches `<n>` → the reset for this issue was already applied on a prior run; treat as `absent`.
     - Does not match (or field absent) → `closed`. Don't patch `trackingIssueNumber` (wrapper resets on closed).
-  - **Multiple matches** → log numbers, skip the repo, surface to user. Don't guess.
+  - **Multiple matches** → all closed: pick the one with the highest issue number (most recent). Log that you're doing so. If any match is open, treat it as a single open match (there should only ever be one open issue; if there are multiple open matches, log and skip).
 
 **c. Scan tracking issue comments for ignore directives** (only if state is `open` or `closed`):
 ```
